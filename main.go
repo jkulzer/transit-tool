@@ -7,6 +7,7 @@ import (
 	"fyne.io/fyne/v2/widget"
 
 	"github.com/jkulzer/transit-tool/db"
+	"github.com/jkulzer/transit-tool/env"
 	"github.com/jkulzer/transit-tool/widgets"
 
 	"github.com/rs/zerolog/log"
@@ -15,6 +16,8 @@ import (
 )
 
 func main() {
+	log.Logger = log.With().Caller().Logger()
+
 	fmt.Println("Data from:")
 	fmt.Println("© OpenStreetMap contributors: https://openstreetmap.org/copyright")
 
@@ -23,17 +26,24 @@ func main() {
 
 	dbConn := db.Init(a)
 
-	completedSetup, err := db.HasCompletedSetup(dbConn)
+	env := env.Env{
+		DB:     dbConn,
+		App:    a,
+		Window: w,
+	}
+
+	completedSetup, err := db.HasCompletedSetup(&env)
 	if err != nil {
 		log.Warn().Msg("failed to get info if is setup process has been completed")
 	}
+	center := widget.NewLabel("TODO")
 
 	if completedSetup {
-		center := widget.NewLabel("TODO")
-
+		log.Trace().Msg("Setup is completed")
 		w.SetContent(center)
 	} else {
-		center := container.NewVBox(widgets.NewCreateGtfsSourceWidget(dbConn))
+		log.Trace().Msg("Setup is not completed")
+		center := container.NewVBox(widgets.NewFirstAppRunWidget(&env))
 		w.SetContent(center)
 	}
 	w.ShowAndRun()
