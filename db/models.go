@@ -13,7 +13,8 @@ type Config struct {
 
 type GtfsSource struct {
 	gorm.Model
-	ID         uint
-	DataPath   string
-	SourceHash string
+	ID          uint
+	Name        string
+	StaticUrl   string
+	RealtimeUrl string
 }

@@ -4,7 +4,10 @@ go 1.23.3
 
 require (
 	fyne.io/fyne/v2 v2.6.0
+	github.com/MobilityData/gtfs-realtime-bindings/golang/gtfs v1.0.0
+	github.com/jamespfennell/gtfs v0.1.24
 	github.com/rs/zerolog v1.34.0
+	google.golang.org/protobuf v1.36.6
 	gorm.io/driver/sqlite v1.5.7
 	gorm.io/gorm v1.26.0
 )

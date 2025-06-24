@@ -1,6 +1,8 @@
 package db
 
 import (
+	"fmt"
+
 	"gorm.io/gorm"
 
 	"github.com/jkulzer/transit-tool/env"
@@ -35,6 +37,8 @@ func HasCompletedSetup(env *env.Env) (bool, error) {
 			}
 		}
 
+		log.Trace().Msg("setup completed: " + fmt.Sprint(config.CompletedSetup))
+		log.Trace().Msg("config object: " + fmt.Sprint(config))
 		return config.CompletedSetup, result.Error
 	}
 }
@@ -51,4 +55,22 @@ func SetupRequirementsFulfilled(env *env.Env) (bool, error) {
 		}
 	}
 	return true, nil
+}
+
+func GetConfig(env *env.Env) (Config, error) {
+	config := Config{ID: 1}
+	result := env.DB.First(&config)
+	if result.Error != nil {
+		return config, result.Error
+	}
+	return config, nil
+}
+
+func GetGtfsDatasource(env *env.Env) (GtfsSource, error) {
+	source := GtfsSource{ID: 1}
+	result := env.DB.First(&source)
+	if result.Error != nil {
+		return source, result.Error
+	}
+	return source, nil
 }

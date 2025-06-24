@@ -5,6 +5,7 @@ import (
 
 	"fyne.io/fyne/v2"
 	"fyne.io/fyne/v2/container"
+	"fyne.io/fyne/v2/dialog"
 	"fyne.io/fyne/v2/widget"
 
 	"github.com/rs/zerolog/log"
@@ -30,7 +31,20 @@ func NewFirstAppRunWidget(env *env.Env) *FirstAppRunWidget {
 	createGtfsSourceWidget := NewCreateGtfsSourceWidget(env)
 
 	w.doneButton = widget.NewButton("Finish Setup", func() {
-		log.Trace().Msg("Finishing setup")
+		config, err := db.GetConfig(env)
+		if err != nil {
+			log.Err(err).Msg("couldn't fetch config")
+			dialog.ShowError(err, env.Window)
+			return
+		}
+		config.CompletedSetup = true
+		result := env.DB.Save(&config)
+		if result.Error != nil {
+			log.Err(err).Msg("failed to save config")
+			dialog.ShowError(err, env.Window)
+			return
+		}
+		env.Window.SetContent(NewDefaultBorderWidget(NewMainPageWidget(env)))
 	})
 	w.doneButton.Disable()
 

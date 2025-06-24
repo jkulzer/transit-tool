@@ -62,6 +62,7 @@
 
 						#db 
 						sqlite
+						sqlitebrowser
 
 						# perf
 						graphviz

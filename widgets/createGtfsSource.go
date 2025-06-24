@@ -19,7 +19,8 @@ type CreateGtfsSourceWidget struct {
 	env          *env.Env
 	createButton *widget.Button
 	name         *widget.Entry
-	url          *widget.Entry
+	staticUrl    *widget.Entry
+	realtimeUrl  *widget.Entry
 }
 
 func NewCreateGtfsSourceWidget(env *env.Env) *CreateGtfsSourceWidget {
@@ -33,18 +34,29 @@ func NewCreateGtfsSourceWidget(env *env.Env) *CreateGtfsSourceWidget {
 	// the regex allows everything that starts and ends with a letter
 	w.name.Validator = validation.NewRegexp("^[A-z].*[A-z]$", "Name must start and end with a letter")
 	w.name.SetPlaceHolder("VBB GTFS Source")
-	w.url = widget.NewEntry()
-	w.url.Validator = validation.NewRegexp(
+	w.staticUrl = widget.NewEntry()
+	w.staticUrl.Validator = validation.NewRegexp(
 		// the regex should verify a http/https url
 		"^(http|https)://[a-zA-Z0-9\\-\\.]+\\.[a-zA-Z]{2,}(/\\S*)?$",
 		"Source must be valid URL",
 	)
-	w.url.SetPlaceHolder("https://production.gtfsrt.vbb.de/data")
+	w.staticUrl.SetPlaceHolder("https://www.vbb.de/fileadmin/user_upload/VBB/Dokumente/API-Datensaetze/gtfs-mastscharf/GTFS.zip")
+	w.staticUrl.Text = "https://www.vbb.de/fileadmin/user_upload/VBB/Dokumente/API-Datensaetze/gtfs-mastscharf/GTFS.zip"
+
+	w.realtimeUrl = widget.NewEntry()
+	w.realtimeUrl.Validator = validation.NewRegexp(
+		// the regex should verify a http/https url
+		"^(http|https)://[a-zA-Z0-9\\-\\.]+\\.[a-zA-Z]{2,}(/\\S*)?$",
+		"Source must be valid URL",
+	)
+	w.realtimeUrl.SetPlaceHolder("https://production.gtfsrt.vbb.de/data")
+	w.realtimeUrl.Text = "https://production.gtfsrt.vbb.de/data"
 
 	form := &widget.Form{
 		Items: []*widget.FormItem{ // we can specify items in the constructor
 			{Text: "Name", Widget: w.name},
-			{Text: "URL", Widget: w.url},
+			{Text: "Static GTFS URL", Widget: w.staticUrl},
+			{Text: "Realtime GTFS URL", Widget: w.realtimeUrl},
 		},
 		SubmitText: "Create",
 		OnSubmit: func() {
@@ -53,13 +65,21 @@ func NewCreateGtfsSourceWidget(env *env.Env) *CreateGtfsSourceWidget {
 				dialog.ShowError(err, env.Window)
 				return
 			}
-			err = w.url.Validate()
+			err = w.staticUrl.Validate()
 			if err != nil {
 				dialog.ShowError(err, env.Window)
 				return
 			}
-			datasource := db.GtfsSource{}
-			result := w.env.DB.Create(&datasource)
+			err = w.realtimeUrl.Validate()
+			if err != nil {
+				dialog.ShowError(err, env.Window)
+				return
+			}
+			datasource, err := db.GetGtfsDatasource(env)
+			datasource.Name = w.name.Text
+			datasource.StaticUrl = w.staticUrl.Text
+			datasource.RealtimeUrl = w.realtimeUrl.Text
+			result := w.env.DB.Save(&datasource)
 			if result.Error != nil {
 				log.Panic().Msg("Failed to create GTFS datasource")
 				dialog.ShowError(result.Error, env.Window)
