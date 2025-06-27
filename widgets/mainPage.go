@@ -6,7 +6,6 @@ import (
 	"fyne.io/fyne/v2/widget"
 
 	"github.com/jkulzer/transit-tool/env"
-	"github.com/jkulzer/transit-tool/gtfs"
 )
 
 type MainPageWidget struct {
@@ -16,11 +15,11 @@ type MainPageWidget struct {
 
 func NewMainPageWidget(env *env.Env) *MainPageWidget {
 	w := &MainPageWidget{}
-	w.content = container.NewVBox(
-		widget.NewLabel("Main Page"),
-	)
+	w.ExtendBaseWidget(w)
 
-	gtfs.GetData(env)
+	w.content = container.NewHBox(
+		NewDepartureSearchWidget(env),
+	)
 
 	return w
 }
