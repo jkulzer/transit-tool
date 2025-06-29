@@ -1,7 +1,6 @@
 package widgets
 
 import (
-	"fmt"
 	"image/color"
 	"time"
 
@@ -71,13 +70,22 @@ func NewDirectionDepartureChipWidget(env *env.Env, stopTimes []gtfs.ScheduledSto
 			routeColor.B = uint8(blue)
 			routeColor.A = uint8(255)
 
+			if routeColor.R == 0 && routeColor.G == 0 && routeColor.B == 0 {
+				routeColor.R = uint8(255)
+				routeColor.G = uint8(255)
+				routeColor.B = uint8(255)
+			}
+
 			w.content.Add(
 				container.NewHBox(
-					canvas.NewText(departureTime.Format("15:04"), color.White),
+					container.NewVBox(
+						canvas.NewText(departureTime.Format("15:04"), color.White),
+						canvas.NewText("no data", color.White),
+					),
 					canvas.NewText(stopTime.Trip.Route.ShortName, routeColor),
 					canvas.NewText(stopTime.Trip.Headsign, color.White),
-					canvas.NewText(fmt.Sprint("direction id:", stopTime.Trip.DirectionId), color.White),
-					canvas.NewText(stopTime.Trip.Route.Id, color.White),
+					// canvas.NewText(fmt.Sprint("direction id:", stopTime.Trip.DirectionId), color.White),
+					// canvas.NewText(stopTime.Trip.Route.Id, color.White),
 				),
 			)
 			return w

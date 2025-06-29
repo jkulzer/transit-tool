@@ -80,6 +80,7 @@ func (w *FirstAppRunWidget) CreateRenderer() fyne.WidgetRenderer {
 						fyne.Do(func() {
 							w.doneButton.Enable()
 						})
+						return
 					}
 				}
 			}

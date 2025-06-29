@@ -174,6 +174,12 @@ func getStaticData(env *env.Env) (*gtfs.Static, error) {
 	return staticData, nil
 }
 
+func getRealtimeData(env *env.Env) (*gtfs.Realtime, error) {
+	if env.GtfsStaticData != nil {
+		return env.GtfsRealtimeData, nil
+	}
+}
+
 func optimizeStaticData(envVar *env.Env, staticData *gtfs.Static) {
 	envVar.GtfsStaticOptimized = env.GtfsStaticOptimized{}
 	envVar.GtfsStaticOptimized.StopTimesByStop = make(map[string][]*gtfs.ScheduledStopTime)

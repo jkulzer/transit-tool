@@ -12,6 +12,7 @@ type Env struct {
 	App                 fyne.App
 	Window              fyne.Window
 	GtfsStaticData      *gtfs.Static
+	GtfsRealtimeData    *gtfs.Realtime
 	GtfsStaticOptimized GtfsStaticOptimized
 }
 
