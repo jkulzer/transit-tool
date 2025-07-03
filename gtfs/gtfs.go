@@ -22,9 +22,14 @@ type StationService struct {
 	// IFOPT code
 	// https://en.wikipedia.org/wiki/Identification_of_Fixed_Objects_in_Public_Transport
 	// could potentially also be something different in different systems, in the VBB GTFS it's IFOPT though
-	StopID  string
-	ERoutes map[string]ExtendedRoute // string is gtfs route id
+	StopID          string
+	ERoutes         map[GtfsRouteID]ExtendedRoute // string is gtfs route id
+	RealtimeTripMap map[GtfsTripID]gtfs.Trip
 }
+
+type GtfsTripID string
+
+type GtfsRouteID string
 
 type ExtendedRoute struct {
 	Route                   gtfs.Route
@@ -49,18 +54,38 @@ func FindStop(env *env.Env, searchString string) ([]gtfs.Stop, error) {
 	return stopList, nil
 }
 
+func mapScheduledAndRealtimeTrips(realtimeTrips []gtfs.Trip, scheduledTrips []gtfs.ScheduledTrip) map[GtfsTripID]gtfs.Trip {
+	tripMap := make(map[GtfsTripID]gtfs.Trip)
+	for _, scheduledTrip := range scheduledTrips {
+		for _, realtimeTrip := range realtimeTrips {
+			if scheduledTrip.ID == realtimeTrip.ID.ID {
+				tripMap[GtfsTripID(scheduledTrip.ID)] = realtimeTrip
+			}
+		}
+	}
+	return tripMap
+}
+
 func QueryForDeparture(env *env.Env, stopName string) StationService {
 	currentTime := time.Now()
 	staticData, err := getStaticData(env)
 	if err != nil {
 		log.Err(err).Msg("failed to get static data")
 	}
+	realtimeData, err := getRealtimeData(env)
+	if err != nil {
+		log.Err(err).Msg("failed to get static data")
+	}
+	log.Debug().Msg("doing stuff with realtime data")
+	for _, trip := range realtimeData.Trips {
+		fmt.Println(len(trip.StopTimeUpdates))
+	}
 	log.Debug().Msg("finished parsing data (" + fmt.Sprint(time.Since(currentTime)) + ")")
 	foundStops, _ := FindStop(env, stopName)
 	log.Debug().Msg("finished finding stops (" + fmt.Sprint(time.Since(currentTime)) + ")")
 
 	service := StationService{}
-	service.ERoutes = make(map[string]ExtendedRoute)
+	service.ERoutes = make(map[GtfsRouteID]ExtendedRoute)
 
 	for _, trip := range staticData.Trips {
 		if serviceCurrentlyRunning(trip.Service, currentTime) {
@@ -68,7 +93,7 @@ func QueryForDeparture(env *env.Env, stopName string) StationService {
 				for _, stop := range foundStops {
 					if strings.Contains(stopTime.Stop.Id, stop.Id) {
 						stopTime.Trip = &trip
-						extendedRoute := service.ERoutes[stopTime.Trip.Route.Id]
+						extendedRoute := service.ERoutes[GtfsRouteID(stopTime.Trip.Route.Id)]
 						switch trip.DirectionId {
 						case gtfs.DirectionID_Unspecified:
 							extendedRoute.StopTimesNoDirection = append(extendedRoute.StopTimesNoDirection, stopTime)
@@ -77,7 +102,7 @@ func QueryForDeparture(env *env.Env, stopName string) StationService {
 						case gtfs.DirectionID_False:
 							extendedRoute.StopTimesDirectionFalse = append(extendedRoute.StopTimesDirectionFalse, stopTime)
 						}
-						service.ERoutes[stopTime.Trip.Route.Id] = extendedRoute
+						service.ERoutes[GtfsRouteID(stopTime.Trip.Route.Id)] = extendedRoute
 					}
 				}
 			}
@@ -98,6 +123,14 @@ func GetData(env *env.Env) {
 	staticData, err := getStaticData(env)
 	if err != nil {
 		log.Err(err).Msg("failed to get static data")
+	}
+	realtimeData, err := getRealtimeData(env)
+	if err != nil {
+		log.Err(err).Msg("failed to get static data")
+	}
+	log.Debug().Msg("doing stuff with realtime data")
+	for _, trip := range realtimeData.Trips {
+		fmt.Println(len(trip.StopTimeUpdates))
 	}
 	currentTime := time.Now()
 	fmt.Printf("VBB has %d routes and %d stations\n", len(staticData.Routes), len(staticData.Stops))
@@ -175,9 +208,53 @@ func getStaticData(env *env.Env) (*gtfs.Static, error) {
 }
 
 func getRealtimeData(env *env.Env) (*gtfs.Realtime, error) {
-	if env.GtfsStaticData != nil {
+	if env.GtfsRealtimeData != nil {
 		return env.GtfsRealtimeData, nil
 	}
+	gtfsSource, err := db.GetGtfsDatasource(env)
+	if err != nil {
+		log.Err(err).Msg("failed getting gtfs datasource")
+		return &gtfs.Realtime{}, err
+	}
+	realtimeGtfsPath := env.App.Storage().RootURI().Path() + "realtimeGtfs.bin"
+	if _, err := os.Stat(realtimeGtfsPath); errors.Is(err, os.ErrNotExist) {
+		log.Trace().Msg("realtime gtfs data not cached")
+		downloadedFile, err := os.Create(realtimeGtfsPath)
+		if err != nil {
+			return &gtfs.Realtime{}, err
+		}
+		defer downloadedFile.Close()
+
+		resp, err := http.Get(gtfsSource.RealtimeUrl)
+		if err != nil {
+			return &gtfs.Realtime{}, err
+		}
+		if resp.StatusCode != http.StatusOK {
+			return &gtfs.Realtime{}, fmt.Errorf("bad status: %s", resp.Status)
+		}
+
+		// Writer the body to file
+		_, err = io.Copy(downloadedFile, resp.Body)
+		if err != nil {
+			return &gtfs.Realtime{}, err
+		}
+	} else {
+		log.Trace().Msg("getting static gtfs data from cache")
+	}
+	file, err := os.Open(realtimeGtfsPath)
+	if err != nil {
+		return &gtfs.Realtime{}, err
+	}
+	fileContent, err := io.ReadAll(file)
+	if err != nil {
+		return &gtfs.Realtime{}, err
+	}
+	realtimeData, err := gtfs.ParseRealtime(fileContent, &gtfs.ParseRealtimeOptions{})
+	if err != nil {
+		return &gtfs.Realtime{}, err
+	}
+	env.GtfsRealtimeData = realtimeData
+	return realtimeData, nil
 }
 
 func optimizeStaticData(envVar *env.Env, staticData *gtfs.Static) {

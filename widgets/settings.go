@@ -17,6 +17,7 @@ type SettingsWidget struct {
 
 func NewSettingsWidget(env *env.Env) *SettingsWidget {
 	w := &SettingsWidget{}
+	w.ExtendBaseWidget(w)
 
 	config, err := db.GetConfig(env)
 	if err != nil {
@@ -30,7 +31,7 @@ func NewSettingsWidget(env *env.Env) *SettingsWidget {
 	realtimeEntry.Text = config.DefaultGtfsSource.RealtimeUrl
 
 	saveButton := widget.NewButton("Save", func() {
-
+		// TODO
 	})
 
 	w.content = container.NewVBox(
@@ -39,6 +40,7 @@ func NewSettingsWidget(env *env.Env) *SettingsWidget {
 		staticEntry,
 		widget.NewLabel("Realtime URL"),
 		realtimeEntry,
+		saveButton,
 	)
 
 	return w

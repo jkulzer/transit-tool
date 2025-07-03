@@ -40,7 +40,7 @@ func main() {
 
 	if completedSetup {
 		log.Trace().Msg("Setup is completed")
-		center := widgets.NewDefaultBorderWidget(widgets.NewMainPageWidget(&env))
+		center := widgets.NewDefaultBorderWidget(&env, widgets.NewMainPageWidget(&env))
 		w.SetContent(center)
 	} else {
 		log.Trace().Msg("Setup is not completed")

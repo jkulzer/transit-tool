@@ -44,7 +44,7 @@ func NewFirstAppRunWidget(env *env.Env) *FirstAppRunWidget {
 			dialog.ShowError(err, env.Window)
 			return
 		}
-		env.Window.SetContent(NewDefaultBorderWidget(NewMainPageWidget(env)))
+		env.Window.SetContent(NewDefaultBorderWidget(env, NewMainPageWidget(env)))
 	})
 	w.doneButton.Disable()
 
