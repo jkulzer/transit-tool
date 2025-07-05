@@ -17,7 +17,7 @@ func NewMainPageWidget(env *env.Env) *MainPageWidget {
 	w := &MainPageWidget{}
 	w.ExtendBaseWidget(w)
 
-	w.content = container.NewHBox(
+	w.content = container.NewVBox(
 		NewDepartureSearchWidget(env),
 	)
 

@@ -1,12 +1,13 @@
 package widgets
 
 import (
+	"fmt"
 	"image/color"
 	"time"
 
 	"github.com/rs/zerolog/log"
 
-	"github.com/jamespfennell/gtfs"
+	// "github.com/jamespfennell/gtfs"
 
 	"fyne.io/fyne/v2"
 	"fyne.io/fyne/v2/canvas"
@@ -45,7 +46,7 @@ type DirectionDepartureChipWidget struct {
 	content *fyne.Container
 }
 
-func NewDirectionDepartureChipWidget(env *env.Env, stopTimes []gtfs.ScheduledStopTime) *DirectionDepartureChipWidget {
+func NewDirectionDepartureChipWidget(env *env.Env, stopTimeList []gtfsHelpers.ExtendedStopTime) *DirectionDepartureChipWidget {
 	w := &DirectionDepartureChipWidget{}
 	w.ExtendBaseWidget(w)
 
@@ -53,14 +54,14 @@ func NewDirectionDepartureChipWidget(env *env.Env, stopTimes []gtfs.ScheduledSto
 
 	currentTime := time.Now()
 
-	for _, stopTime := range stopTimes {
-		departureDuration := stopTime.DepartureTime
+	for _, stopTime := range stopTimeList {
+		departureDuration := stopTime.StopTime.DepartureTime
 		departureTime := time.Date(currentTime.Year(), currentTime.Month(), currentTime.Day(), int(0), int(0), int(0), int(0), currentTime.Location()).Add(departureDuration)
 
 		if departureTime.After(currentTime) {
 
 			routeColor := color.RGBA{255, 255, 255, 1}
-			colorString := stopTime.Trip.Route.Color
+			colorString := stopTime.StopTime.Trip.Route.Color
 			red, green, blue, err := helpers.ColorFromString(colorString)
 			if err != nil {
 				log.Err(err).Msg("failed to parse color " + colorString)
@@ -76,14 +77,18 @@ func NewDirectionDepartureChipWidget(env *env.Env, stopTimes []gtfs.ScheduledSto
 				routeColor.B = uint8(255)
 			}
 
+			for _, stopTimeUpdate := range stopTime.RTTrip.StopTimeUpdates {
+				log.Debug().Msg(fmt.Sprint(stopTimeUpdate))
+			}
+
 			w.content.Add(
 				container.NewHBox(
 					container.NewVBox(
 						canvas.NewText(departureTime.Format("15:04"), color.White),
 						canvas.NewText("no data", color.White),
 					),
-					canvas.NewText(stopTime.Trip.Route.ShortName, routeColor),
-					canvas.NewText(stopTime.Trip.Headsign, color.White),
+					canvas.NewText(stopTime.StopTime.Trip.Route.ShortName, routeColor),
+					canvas.NewText(stopTime.StopTime.Trip.Headsign, color.White),
 					// canvas.NewText(fmt.Sprint("direction id:", stopTime.Trip.DirectionId), color.White),
 					// canvas.NewText(stopTime.Trip.Route.Id, color.White),
 				),

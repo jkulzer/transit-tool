@@ -19,6 +19,8 @@ type DefaultBorderWidget struct {
 
 func NewDefaultBorderWidget(env *env.Env, center fyne.CanvasObject) *DefaultBorderWidget {
 	w := &DefaultBorderWidget{}
+	w.ExtendBaseWidget(w)
+
 	w.content = container.NewBorder(
 		widget.NewToolbar(
 			widget.NewToolbarAction(theme.MenuIcon(), func() {
