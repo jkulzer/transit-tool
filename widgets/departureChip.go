@@ -8,13 +8,15 @@ import (
 
 	"github.com/rs/zerolog/log"
 
-	// "github.com/jamespfennell/gtfs"
+	gtfsProto "github.com/jamespfennell/gtfs/proto"
 
 	"fyne.io/fyne/v2"
 	"fyne.io/fyne/v2/canvas"
 	"fyne.io/fyne/v2/container"
+	// "fyne.io/fyne/v2/dialog"
 	"fyne.io/fyne/v2/widget"
 
+	"github.com/jkulzer/transit-tool/colors"
 	"github.com/jkulzer/transit-tool/env"
 	gtfsHelpers "github.com/jkulzer/transit-tool/gtfs"
 	"github.com/jkulzer/transit-tool/helpers"
@@ -23,10 +25,12 @@ import (
 type DepartureChipWidget struct {
 	widget.BaseWidget
 	content *fyne.Container
+	env     *env.Env
 }
 
 func NewDepartureChipWidget(env *env.Env, eRoute gtfsHelpers.ExtendedRoute) *DepartureChipWidget {
-	w := &DepartureChipWidget{}
+	log.Debug().Msg("creating departure chip widget")
+	w := &DepartureChipWidget{env: env}
 	w.ExtendBaseWidget(w)
 
 	w.content = container.NewVBox(
@@ -44,11 +48,16 @@ func (w *DepartureChipWidget) CreateRenderer() fyne.WidgetRenderer {
 
 type DirectionDepartureChipWidget struct {
 	widget.BaseWidget
-	content *fyne.Container
+	content      *fyne.Container
+	env          *env.Env
+	stopTimeList []gtfsHelpers.ExtendedStopTime
 }
 
 func NewDirectionDepartureChipWidget(env *env.Env, stopTimeList []gtfsHelpers.ExtendedStopTime) *DirectionDepartureChipWidget {
-	w := &DirectionDepartureChipWidget{}
+	w := &DirectionDepartureChipWidget{
+		env:          env,
+		stopTimeList: stopTimeList,
+	}
 	w.ExtendBaseWidget(w)
 
 	w.content = container.NewHBox()
@@ -78,36 +87,60 @@ func NewDirectionDepartureChipWidget(env *env.Env, stopTimeList []gtfsHelpers.Ex
 				routeColor.B = uint8(255)
 			}
 
-			departureDelay := "no data"
+			departureDelayWidget := canvas.NewText("no data", color.White)
 
 			log.Debug().Msg("trip: " + stopTime.StopTime.Trip.Headsign)
 
+			log.Debug().Msg(fmt.Sprint(stopTime.RTTrip.ID.ScheduleRelationship))
 			for _, stopTimeUpdate := range stopTime.RTTrip.StopTimeUpdates {
-				if strings.Contains(stopTime.StopTime.Stop.Id, *stopTimeUpdate.StopID) {
-					// if stopTimeUpdate.Departure != nil {
-					if stopTimeUpdate.Departure.Time != nil {
-						// departureDelay = stopTimeUpdate.Departure.Time.Format("15:04")
-						agencyTimezone := stopTime.StopTime.Trip.Route.Agency.Timezone
-						location, err := time.LoadLocation(agencyTimezone)
-						if err != nil {
-							log.Err(err).Msg("failed loading location for timezone " + agencyTimezone)
-							break
+				// if strings.Contains(stopTime.StopTime.Stop.Id, *stopTimeUpdate.StopID) {
+				if strings.Contains(stopTime.StopTime.Stop.Id, *stopTimeUpdate.StopID) && stopTime.StopTime.Stop.Id != *stopTimeUpdate.StopID {
+					// if stopTime.StopTime.Stop.Id == *stopTimeUpdate.StopID {
+					var delayColor color.Color
+					var delayString string
+					if stopTime.RTTrip.ID.ScheduleRelationship == gtfsProto.TripDescriptor_CANCELED {
+						delayString = "cancelled"
+						delayColor = colors.Red()
+						log.Debug().Msg("trip cancelled")
+					} else {
+						// if the delay is stored as a difference from the scheduled time
+						if stopTimeUpdate.Departure.Delay != nil {
+							if *stopTimeUpdate.Departure.Delay > 0 {
+								delayColor = colors.Red()
+							} else {
+								delayColor = colors.Green()
+							}
+							delayString = stopTimeUpdate.Departure.Delay.String()
+
+							// if the delay is stored as a time of departure/arrival
+						} else if stopTimeUpdate.Departure.Time != nil {
+							agencyTimezone := stopTime.StopTime.Trip.Route.Agency.Timezone
+							location, err := time.LoadLocation(agencyTimezone)
+							if err != nil {
+								log.Err(err).Msg("failed loading location for timezone " + agencyTimezone)
+								break
+							}
+							departureDate := stopTimeUpdate.Departure.Time
+							timezoneCorrectedDate := time.Date(departureDate.Year(), departureDate.Month(), departureTime.Day(), departureTime.Hour(), departureTime.Minute(), departureTime.Second(), departureTime.Nanosecond(), location)
+							differenceToScheduled := departureTime.Sub(timezoneCorrectedDate)
+							if differenceToScheduled > 0 {
+								delayColor = colors.Red()
+							} else {
+								delayColor = colors.Green()
+							}
+							delayString = differenceToScheduled.String()
 						}
-						departureDate := stopTimeUpdate.Departure.Time
-						timezoneCorrectedDate := time.Date(departureDate.Year(), departureDate.Month(), departureTime.Day(), departureTime.Hour(), departureTime.Minute(), departureTime.Second(), departureTime.Nanosecond(), location)
-						departureDelay = timezoneCorrectedDate.String()
-					} else if stopTimeUpdate.Departure.Delay != nil {
-						departureDelay = stopTimeUpdate.Departure.Delay.String()
 					}
+					departureDelayWidget = canvas.NewText(delayString, delayColor)
 				}
 			}
-			log.Debug().Msg("length of stop time updates for trip " + stopTime.StopTime.Trip.ID + " is " + fmt.Sprint(len(stopTime.RTTrip.StopTimeUpdates)))
+			log.Debug().Msg("length of stop time updates for trip " + stopTime.StopTime.Trip.ID + " and route " + stopTime.StopTime.Trip.Route.Id + " is " + fmt.Sprint(len(stopTime.RTTrip.StopTimeUpdates)))
 
 			w.content.Add(
 				container.NewHBox(
 					container.NewVBox(
 						canvas.NewText(departureTime.Format("15:04"), color.White),
-						canvas.NewText(departureDelay, color.White),
+						departureDelayWidget,
 					),
 					canvas.NewText(stopTime.StopTime.Trip.Route.ShortName, routeColor),
 					canvas.NewText(stopTime.StopTime.Trip.Headsign, color.White),
@@ -116,6 +149,7 @@ func NewDirectionDepartureChipWidget(env *env.Env, stopTimeList []gtfsHelpers.Ex
 					// canvas.NewText(stopTime.Trip.Route.Id, color.White),
 				),
 			)
+			log.Debug().Msg("completed subwidget for departure chip")
 			return w
 		}
 	}
@@ -126,3 +160,10 @@ func NewDirectionDepartureChipWidget(env *env.Env, stopTimeList []gtfsHelpers.Ex
 func (w *DirectionDepartureChipWidget) CreateRenderer() fyne.WidgetRenderer {
 	return widget.NewSimpleRenderer(w.content)
 }
+
+// func (w *DirectionDepartureChipWidget) OnClick() {
+// 	go func() {
+// 		tripView := NewTripViewWidget(w.env, *w.stopTimeList[0].StopTime.Trip, w.stopTimeList[0].RTTrip)
+// 		dialog.NewCustom("Route", "Close", tripView, w.env.Window)
+// 	}()
+// }

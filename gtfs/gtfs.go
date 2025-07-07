@@ -188,7 +188,8 @@ func getRealtimeData(env *env.Env) (*gtfs.Realtime, error) {
 		return &gtfs.Realtime{}, err
 	}
 	realtimeGtfsPath := env.App.Storage().RootURI().Path() + "realtimeGtfs.bin"
-	if _, err := os.Stat(realtimeGtfsPath); errors.Is(err, os.ErrNotExist) {
+	// if _, err := os.Stat(realtimeGtfsPath); errors.Is(err, os.ErrNotExist) {
+	if true {
 		log.Trace().Msg("realtime gtfs data not cached")
 		downloadedFile, err := os.Create(realtimeGtfsPath)
 		if err != nil {

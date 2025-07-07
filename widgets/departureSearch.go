@@ -5,6 +5,8 @@ import (
 	"fyne.io/fyne/v2/container"
 	"fyne.io/fyne/v2/widget"
 
+	"github.com/rs/zerolog/log"
+
 	"github.com/jkulzer/transit-tool/completion"
 	"github.com/jkulzer/transit-tool/env"
 	"github.com/jkulzer/transit-tool/gtfs"
@@ -43,16 +45,17 @@ func NewDepartureSearchWidget(env *env.Env) *DepartureSearchWidget {
 	}
 
 	searchButton := widget.NewButton("Search", func() {
-		go func() {
-			stationService := gtfs.QueryForDeparture(env, input.Text)
+		// go func() {
+		stationService := gtfs.QueryForDeparture(env, input.Text)
 
-			resultBox.Objects = nil
+		resultBox.Objects = nil
 
-			for _, eRoute := range stationService.ERoutes {
-				resultBox.Add(NewDepartureChipWidget(env, eRoute))
-				fyne.Do(func() { w.Refresh() })
-			}
-		}()
+		for _, eRoute := range stationService.ERoutes {
+			resultBox.Add(NewDepartureChipWidget(env, eRoute))
+			// fyne.Do(func() { w.Refresh() })
+		}
+		log.Debug().Msg("finished departure search")
+		// }()
 	})
 	scrollContainer := container.NewVScroll(resultBox)
 	scrollContainer.SetMinSize(fyne.NewSize(0, 500))
