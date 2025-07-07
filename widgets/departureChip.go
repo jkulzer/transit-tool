@@ -3,6 +3,7 @@ package widgets
 import (
 	"fmt"
 	"image/color"
+	"strings"
 	"time"
 
 	"github.com/rs/zerolog/log"
@@ -77,18 +78,40 @@ func NewDirectionDepartureChipWidget(env *env.Env, stopTimeList []gtfsHelpers.Ex
 				routeColor.B = uint8(255)
 			}
 
+			departureDelay := "no data"
+
+			log.Debug().Msg("trip: " + stopTime.StopTime.Trip.Headsign)
+
 			for _, stopTimeUpdate := range stopTime.RTTrip.StopTimeUpdates {
-				log.Debug().Msg(fmt.Sprint(stopTimeUpdate))
+				if strings.Contains(stopTime.StopTime.Stop.Id, *stopTimeUpdate.StopID) {
+					// if stopTimeUpdate.Departure != nil {
+					if stopTimeUpdate.Departure.Time != nil {
+						// departureDelay = stopTimeUpdate.Departure.Time.Format("15:04")
+						agencyTimezone := stopTime.StopTime.Trip.Route.Agency.Timezone
+						location, err := time.LoadLocation(agencyTimezone)
+						if err != nil {
+							log.Err(err).Msg("failed loading location for timezone " + agencyTimezone)
+							break
+						}
+						departureDate := stopTimeUpdate.Departure.Time
+						timezoneCorrectedDate := time.Date(departureDate.Year(), departureDate.Month(), departureTime.Day(), departureTime.Hour(), departureTime.Minute(), departureTime.Second(), departureTime.Nanosecond(), location)
+						departureDelay = timezoneCorrectedDate.String()
+					} else if stopTimeUpdate.Departure.Delay != nil {
+						departureDelay = stopTimeUpdate.Departure.Delay.String()
+					}
+				}
 			}
+			log.Debug().Msg("length of stop time updates for trip " + stopTime.StopTime.Trip.ID + " is " + fmt.Sprint(len(stopTime.RTTrip.StopTimeUpdates)))
 
 			w.content.Add(
 				container.NewHBox(
 					container.NewVBox(
 						canvas.NewText(departureTime.Format("15:04"), color.White),
-						canvas.NewText("no data", color.White),
+						canvas.NewText(departureDelay, color.White),
 					),
 					canvas.NewText(stopTime.StopTime.Trip.Route.ShortName, routeColor),
 					canvas.NewText(stopTime.StopTime.Trip.Headsign, color.White),
+					canvas.NewText("Trip ID: "+stopTime.StopTime.Trip.ID, color.White),
 					// canvas.NewText(fmt.Sprint("direction id:", stopTime.Trip.DirectionId), color.White),
 					// canvas.NewText(stopTime.Trip.Route.Id, color.White),
 				),

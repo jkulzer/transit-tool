@@ -61,22 +61,6 @@ func FindStop(env *env.Env, searchString string) ([]gtfs.Stop, error) {
 	return stopList, nil
 }
 
-// func mapScheduledAndRealtimeTrips(realtimeTrips []gtfs.Trip, scheduledTrips []gtfs.ScheduledTrip) map[GtfsTripID]gtfs.Trip {
-// 	tripMap := make(map[GtfsTripID]gtfs.Trip)
-// 	for _, scheduledTrip := range scheduledTrips {
-// 		for _, realtimeTrip := range realtimeTrips {
-// 			if scheduledTrip.ID == realtimeTrip.ID.ID {
-// 				tripMap[GtfsTripID(scheduledTrip.ID)] = realtimeTrip
-// 				log.Debug().Msg("found a rt and scheduled trip match")
-// 				fmt.Println("")
-// 				fmt.Println(scheduledTrip.ID)
-// 				fmt.Println(realtimeTrip.ID)
-// 			}
-// 		}
-// 	}
-// 	return tripMap
-// }
-
 func QueryForDeparture(env *env.Env, stopName string) StationService {
 	currentTime := time.Now()
 	staticData, err := getStaticData(env)
@@ -90,41 +74,45 @@ func QueryForDeparture(env *env.Env, stopName string) StationService {
 	log.Debug().Msg("doing stuff with realtime data")
 	// rtScheduledTripMap := mapScheduledAndRealtimeTrips(realtimeData.Trips, staticData.Trips)
 	log.Debug().Msg("finished parsing data (" + fmt.Sprint(time.Since(currentTime)) + ")")
-	// foundStops, _ := FindStop(env, stopName)
-	log.Debug().Msg("finished finding stops (" + fmt.Sprint(time.Since(currentTime)) + ")")
 
 	service := StationService{}
 	service.ERoutes = make(map[GtfsRouteID]ExtendedRoute)
 
-	for _, trip := range staticData.Trips {
-		for _, rtTrip := range realtimeData.Trips {
-			if rtTrip.ID.ID == trip.ID || rtTrip.ID.ScheduleRelationship != 0 {
-				if trip.Route.ShortName == "U5" {
-					log.Debug().Msg("trip id: " + trip.ID + " with route " + trip.Route.ShortName + " matched RT trip with id " + rtTrip.ID.ID + " and has relationship " + fmt.Sprint(rtTrip.ID.ScheduleRelationship))
-					log.Debug().Msg(fmt.Sprint(serviceCurrentlyRunning(trip.Service, currentTime)))
-				}
-			}
-		}
-		// if serviceCurrentlyRunning(trip.Service, currentTime) {
-		if tripCurrentlyRunning(trip, currentTime) {
-			for _, stopTime := range trip.StopTimes {
-				for _, foundStop := range foundStops {
-					if strings.Contains(stopTime.Stop.Id, foundStop.Id) {
-						stopTime.Trip = &trip
-						extendedRoute := service.ERoutes[GtfsRouteID(stopTime.Trip.Route.Id)]
-						// log.Debug().Msg(fmt.Sprint("rt trip: ", rtTrip))
-						extendedStopTime := ExtendedStopTime{StopTime: stopTime}
-						switch trip.DirectionId {
-						case gtfs.DirectionID_Unspecified:
-							extendedRoute.StopTimesNoDirection = append(extendedRoute.StopTimesNoDirection, extendedStopTime)
-						case gtfs.DirectionID_True:
-							extendedRoute.StopTimesDirectionTrue = append(extendedRoute.StopTimesDirectionTrue, extendedStopTime)
-						case gtfs.DirectionID_False:
-							extendedRoute.StopTimesDirectionFalse = append(extendedRoute.StopTimesDirectionFalse, extendedStopTime)
-						}
-						service.ERoutes[GtfsRouteID(stopTime.Trip.Route.Id)] = extendedRoute
+	activeTrips := getActiveTrips(staticData.Trips, currentTime)
+
+	for _, trip := range activeTrips {
+		for _, stopTime := range trip.StopTimes {
+			if stopTime.Stop.Name == stopName {
+
+				stopTime.Trip = &trip
+
+				extendedRoute := service.ERoutes[GtfsRouteID(stopTime.Trip.Route.Id)]
+				var extendedStopTime ExtendedStopTime
+				// extendedStopTime := ExtendedStopTime{StopTime: stopTime}
+
+				// associating realtime trip with scheduled trip
+			rtTripLoop:
+				for _, rtTrip := range realtimeData.Trips {
+					if rtTrip.ID.ID == trip.ID || rtTrip.ID.ScheduleRelationship != 0 {
+						log.Debug().Msg("trip id: " + trip.ID + " with route " + trip.Route.ShortName + " matched RT trip with id " + rtTrip.ID.ID + " and has relationship " + fmt.Sprint(rtTrip.ID.ScheduleRelationship))
+						log.Debug().Msg(fmt.Sprint(tripCurrentlyRunning(&trip, currentTime)))
+						extendedStopTime.RTTrip = rtTrip
+						extendedStopTime = ExtendedStopTime{StopTime: stopTime, RTTrip: rtTrip}
+						break rtTripLoop
 					}
 				}
+
+				// matching directions
+				switch trip.DirectionId {
+				case gtfs.DirectionID_Unspecified:
+					extendedRoute.StopTimesNoDirection = append(extendedRoute.StopTimesNoDirection, extendedStopTime)
+				case gtfs.DirectionID_True:
+					extendedRoute.StopTimesDirectionTrue = append(extendedRoute.StopTimesDirectionTrue, extendedStopTime)
+				case gtfs.DirectionID_False:
+					extendedRoute.StopTimesDirectionFalse = append(extendedRoute.StopTimesDirectionFalse, extendedStopTime)
+				}
+				service.ERoutes[GtfsRouteID(stopTime.Trip.Route.Id)] = extendedRoute
+
 			}
 		}
 	}
@@ -137,43 +125,6 @@ func QueryForDeparture(env *env.Env, stopName string) StationService {
 	}
 	log.Debug().Msg("finished departure query (" + fmt.Sprint(time.Since(currentTime)) + ")")
 	return service
-}
-
-func GetData(env *env.Env) {
-	staticData, err := getStaticData(env)
-	if err != nil {
-		log.Err(err).Msg("failed to get static data")
-	}
-	realtimeData, err := getRealtimeData(env)
-	if err != nil {
-		log.Err(err).Msg("failed to get static data")
-	}
-	log.Debug().Msg("doing stuff with realtime data")
-	for _, trip := range realtimeData.Trips {
-		fmt.Println(len(trip.StopTimeUpdates))
-	}
-	currentTime := time.Now()
-	fmt.Printf("VBB has %d routes and %d stations\n", len(staticData.Routes), len(staticData.Stops))
-	foundStops, _ := FindStop(env, "Samariterstr.")
-
-	var stopTimeList []gtfs.ScheduledStopTime
-	for _, trip := range staticData.Trips {
-		for _, stopTime := range trip.StopTimes {
-			stopTime.Trip = &trip
-			for _, stop := range foundStops {
-				if strings.Contains(stopTime.Stop.Id, stop.Id) {
-					if serviceCurrentlyRunning(stopTime.Trip.Service, currentTime) {
-						stopTimeList = append(stopTimeList, stopTime)
-					}
-				}
-			}
-		}
-	}
-	for _, stopTime := range sortStopTimes(stopTimeList) {
-		departureDuration := stopTime.DepartureTime
-		departureTime := time.Date(currentTime.Year(), currentTime.Month(), currentTime.Day(), int(0), int(0), int(0), int(0), currentTime.Location()).Add(departureDuration)
-		fmt.Println(departureTime, stopTime.Stop.Name, "(", stopTime.Stop.Id, ")", stopTime.Trip.Route.ShortName, "to", stopTime.Trip.Headsign, "start date:", stopTime.Trip.Service.StartDate, "end date:", stopTime.Trip.Service.EndDate)
-	}
 }
 
 func getStaticData(env *env.Env) (*gtfs.Static, error) {
@@ -292,31 +243,71 @@ func optimizeStaticData(envVar *env.Env, staticData *gtfs.Static) {
 	}
 }
 
+func tripPastMidnight(trip *gtfs.ScheduledTrip) bool {
+	if trip.StopTimes[len(trip.StopTimes)-1].ArrivalTime > time.Hour*24 {
+		return true
+	} else {
+		return false
+	}
+}
+
 // could possibly be optimized further with early returns
 func tripCurrentlyRunning(trip *gtfs.ScheduledTrip, currentTime time.Time) bool {
-	// first departure time of RB69 at 13:15
-	// it's currently the 03.01 at 14:30
-	// subtracting 14:30 - 13:15 gives 01:15, which is still in the current day
-	// therefore it can be checked if the current weekday and the service weekday are identical
 
-	// first departure time of RB420 at 23:30
-	// last departure time of RB420 at 24:30
-	// it's currently the 05.02 at 00:15
-	// subtracting 05.02/00:15 - 24:30 gives
-	// FUCK
-	// this is fucking complicated
-	// maybe this entire architecture needs to be rethought
+	var isActiveService bool
 
-	formattedArrivalTime := currentTime.Add(-trip.StopTimes[len(trip.StopTimes)-1].ArrivalTime)
-	formattedDepartureTime := currentTime.Add(-trip.StopTimes[0].DepartureTime)
+	switch currentTime.Weekday() {
+	case time.Monday:
+		if trip.Service.Monday || (tripPastMidnight(trip) && trip.Service.Sunday) {
+			isActiveService = true
+		} else {
+			isActiveService = false
+		}
+	case time.Tuesday:
+		if trip.Service.Tuesday || (tripPastMidnight(trip) && trip.Service.Monday) {
+			isActiveService = true
+		} else {
+			isActiveService = false
+		}
+	case time.Wednesday:
+		if trip.Service.Wednesday || (tripPastMidnight(trip) && trip.Service.Tuesday) {
+			isActiveService = true
+		} else {
+			isActiveService = false
+		}
+	case time.Thursday:
+		if trip.Service.Thursday || (tripPastMidnight(trip) && trip.Service.Wednesday) {
+			isActiveService = true
+		} else {
+			isActiveService = false
+		}
+	case time.Friday:
+		if trip.Service.Friday || (tripPastMidnight(trip) && trip.Service.Thursday) {
+			isActiveService = true
+		} else {
+			isActiveService = false
+		}
+	case time.Saturday:
+		if trip.Service.Saturday || (tripPastMidnight(trip) && trip.Service.Friday) {
+			isActiveService = true
+		} else {
+			isActiveService = false
+		}
+	case time.Sunday:
+		if trip.Service.Sunday || (tripPastMidnight(trip) && trip.Service.Saturday) {
+			isActiveService = true
+		} else {
+			isActiveService = false
+		}
+	}
 
-	for _, addedDate := range service.AddedDates {
+	for _, addedDate := range trip.Service.AddedDates {
 		if addedDate.Year() == currentTime.Year() && addedDate.Month() == currentTime.Month() && addedDate.Day() == currentTime.Day() {
 			isActiveService = true
 			return true
 		}
 	}
-	for _, removedDate := range service.RemovedDates {
+	for _, removedDate := range trip.Service.RemovedDates {
 		if removedDate.Year() == currentTime.Year() && removedDate.Month() == currentTime.Month() && removedDate.Day() == currentTime.Day() {
 			isActiveService = false
 			return false
@@ -360,4 +351,14 @@ func SearchStopList(searchTerm string, env *env.Env) fuzzy.Ranks {
 	sort.Sort(rankedStopList)
 
 	return rankedStopList
+}
+
+func getActiveTrips(trips []gtfs.ScheduledTrip, currentTime time.Time) []gtfs.ScheduledTrip {
+	var activeTrips []gtfs.ScheduledTrip
+	for _, trip := range trips {
+		if tripCurrentlyRunning(&trip, currentTime) {
+			activeTrips = append(activeTrips, trip)
+		}
+	}
+	return activeTrips
 }
