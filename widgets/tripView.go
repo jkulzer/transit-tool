@@ -93,6 +93,7 @@ func NewTripViewWidget(env *env.Env, scheduledTrip gtfs.ScheduledTrip, realtimeT
 	w.content = container.NewVScroll(
 		container.NewBorder(
 			container.NewVBox(
+				widget.NewLabel("route ID: "+scheduledTrip.Route.Id),
 				widget.NewLabel("scheduled trip ID: "+scheduledTrip.ID),
 				widget.NewLabel("realtime trip ID: "+realtimeTrip.ID.ID),
 				widget.NewLabel("service is active on:  "+fmt.Sprint(weekdaysActive)),

@@ -33,12 +33,16 @@ func NewDepartureChipWidget(env *env.Env, eRoute gtfsHelpers.ExtendedRoute) *Dep
 	w := &DepartureChipWidget{env: env}
 	w.ExtendBaseWidget(w)
 
-	w.content = container.NewVBox(
-		NewDirectionDepartureChipWidget(env, eRoute.StopTimesDirectionTrue),
-		NewDirectionDepartureChipWidget(env, eRoute.StopTimesDirectionFalse),
-		NewDirectionDepartureChipWidget(env, eRoute.StopTimesNoDirection),
-	)
-
+	w.content = container.NewVBox()
+	if len(eRoute.StopTimesDirectionTrue) > 0 {
+		w.content.Add(NewDirectionDepartureChipWidget(env, eRoute.StopTimesDirectionTrue))
+	}
+	if len(eRoute.StopTimesDirectionFalse) > 0 {
+		w.content.Add(NewDirectionDepartureChipWidget(env, eRoute.StopTimesDirectionFalse))
+	}
+	if len(eRoute.StopTimesNoDirection) > 0 {
+		w.content.Add(NewDirectionDepartureChipWidget(env, eRoute.StopTimesNoDirection))
+	}
 	return w
 }
 
@@ -65,11 +69,13 @@ func NewDirectionDepartureChipWidget(env *env.Env, stopTimeList []gtfsHelpers.Ex
 
 	currentTime := time.Now()
 
+	log.Debug().Msg("creating direction departure widget for route " + fmt.Sprint(stopTimeList[0].StopTime.Trip.Route.ShortName))
+
 	for _, stopTime := range stopTimeList {
 		departureDuration := stopTime.StopTime.DepartureTime
 		departureTime := time.Date(currentTime.Year(), currentTime.Month(), currentTime.Day(), int(0), int(0), int(0), int(0), currentTime.Location()).Add(departureDuration)
 
-		if departureTime.After(currentTime) {
+		if departureTime.After(currentTime) && departureTime.Sub(time.Now()) < time.Hour {
 
 			routeColor := color.RGBA{255, 255, 255, 1}
 			colorString := stopTime.StopTime.Trip.Route.Color
@@ -96,6 +102,10 @@ func NewDirectionDepartureChipWidget(env *env.Env, stopTimeList []gtfsHelpers.Ex
 
 			log.Debug().Msg(fmt.Sprint(stopTime.RTTrip.ID.ScheduleRelationship))
 			for _, stopTimeUpdate := range stopTime.RTTrip.StopTimeUpdates {
+				if stopTimeUpdate.StopID == nil || stopTime.StopTime.Stop.Id == "" {
+					log.Debug().Msg(fmt.Sprint(stopTimeUpdate))
+					log.Debug().Msg(fmt.Sprint(stopTime.StopTime))
+				}
 				if strings.Contains(stopTime.StopTime.Stop.Id, *stopTimeUpdate.StopID) && stopTime.StopTime.Stop.Id != *stopTimeUpdate.StopID {
 					var delayColor color.Color
 					var delayString string
@@ -126,7 +136,8 @@ func NewDirectionDepartureChipWidget(env *env.Env, stopTimeList []gtfsHelpers.Ex
 					canvas.NewText(stopTime.StopTime.Trip.Route.ShortName, routeColor),
 					canvas.NewText(stopTime.StopTime.Trip.Headsign, color.White),
 					canvas.NewText("Trip ID: "+stopTime.StopTime.Trip.ID, color.White),
-					// canvas.NewText(fmt.Sprint("direction id:", stopTime.Trip.DirectionId), color.White),
+					canvas.NewText(fmt.Sprint("direction id:", stopTime.StopTime.Trip.DirectionId), color.White),
+					canvas.NewText(fmt.Sprint("route id:", stopTime.StopTime.Trip.Route.Id), color.White),
 					// canvas.NewText(stopTime.Trip.Route.Id, color.White),
 				),
 			)

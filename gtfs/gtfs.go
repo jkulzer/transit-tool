@@ -46,7 +46,7 @@ type ExtendedStopTime struct {
 
 func QueryForDeparture(env *env.Env, stopName string) StationService {
 	currentTime := time.Now()
-	staticData, err := getStaticData(env)
+	staticData, err := GetStaticData(env)
 	if err != nil {
 		log.Err(err).Msg("failed to get static data")
 	}
@@ -70,19 +70,19 @@ func QueryForDeparture(env *env.Env, stopName string) StationService {
 				stopTime.Trip = &trip
 
 				extendedRoute := service.ERoutes[GtfsRouteID(stopTime.Trip.Route.Id)]
-				var extendedStopTime ExtendedStopTime
-				// extendedStopTime := ExtendedStopTime{StopTime: stopTime}
+				extendedStopTime := ExtendedStopTime{StopTime: stopTime}
 
 				// associating realtime trip with scheduled trip
 			rtTripLoop:
 				for _, rtTrip := range realtimeData.Trips {
 					// checks if the IDs of the static and realtime trip are identical
 					// the scheduleRelationship thing is if the trip isn't scheduled and only exists in realtime. this is probably a bullshit solution and will have to be implemented more carefully
-					if rtTrip.ID.ID == trip.ID || rtTrip.ID.ScheduleRelationship != 0 {
+					// if rtTrip.ID.ID == trip.ID || rtTrip.ID.ScheduleRelationship != 0 {
+					if rtTrip.ID.ID == trip.ID {
 						log.Debug().Msg("trip id: " + trip.ID + " with route " + trip.Route.ShortName + " matched RT trip with id " + rtTrip.ID.ID + " and has relationship " + fmt.Sprint(rtTrip.ID.ScheduleRelationship))
-						log.Debug().Msg(fmt.Sprint(tripCurrentlyRunning(&trip, currentTime)))
+						// log.Debug().Msg(fmt.Sprint(tripCurrentlyRunning(&trip, currentTime)))
 						extendedStopTime.RTTrip = rtTrip
-						extendedStopTime = ExtendedStopTime{StopTime: stopTime, RTTrip: rtTrip}
+						// extendedStopTime = ExtendedStopTime{StopTime: stopTime, RTTrip: rtTrip}
 						break rtTripLoop
 					}
 				}
@@ -111,7 +111,7 @@ func QueryForDeparture(env *env.Env, stopName string) StationService {
 	return service
 }
 
-func getStaticData(env *env.Env) (*gtfs.Static, error) {
+func GetStaticData(env *env.Env) (*gtfs.Static, error) {
 	if env.GtfsStaticData != nil {
 		return env.GtfsStaticData, nil
 	}
@@ -309,7 +309,7 @@ func sortExtendedStopTimes(stopTimes []ExtendedStopTime) []ExtendedStopTime {
 }
 
 func SearchStopList(searchTerm string, env *env.Env) fuzzy.Ranks {
-	staticData, err := getStaticData(env)
+	staticData, err := GetStaticData(env)
 	if err != nil {
 		log.Err(err).Msg("failed to get static data")
 	}

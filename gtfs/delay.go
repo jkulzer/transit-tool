@@ -1,12 +1,9 @@
 package gtfs
 
 import (
-	"fmt"
 	"time"
 
 	"github.com/jamespfennell/gtfs"
-
-	"github.com/rs/zerolog/log"
 )
 
 func ProcessStopTimeUpdate(stopTimeUpdate gtfs.StopTimeUpdate, scheduledStopTime gtfs.ScheduledStopTime, currentTime time.Time) (bool, time.Duration) {
@@ -29,7 +26,6 @@ func ProcessStopTimeUpdate(stopTimeUpdate gtfs.StopTimeUpdate, scheduledStopTime
 		// fmt.Println(scheduledStopTime.Trip.Route)
 		// route := *scheduledStopTime.Trip.Route
 		agencyTimezone := time.Now().Location()
-		log.Debug().Msg("agency location is " + fmt.Sprint(agencyTimezone))
 		departureDate := stopTimeUpdate.Departure.Time
 		timezoneCorrectedDate := time.Date(departureDate.Year(), departureDate.Month(), departureTime.Day(), departureTime.Hour(), departureTime.Minute(), departureTime.Second(), departureTime.Nanosecond(), agencyTimezone)
 		differenceToScheduled := departureTime.Sub(timezoneCorrectedDate)

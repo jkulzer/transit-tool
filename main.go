@@ -6,6 +6,7 @@ import (
 	"fyne.io/fyne/v2/container"
 
 	"github.com/jkulzer/transit-tool/db"
+	"github.com/jkulzer/transit-tool/debugView"
 	"github.com/jkulzer/transit-tool/env"
 	"github.com/jkulzer/transit-tool/widgets"
 
@@ -33,6 +34,7 @@ func main() {
 		Window: w,
 	}
 
+	args := os.Args[1:]
 	completedSetup, err := db.HasCompletedSetup(&env)
 	if err != nil {
 		log.Warn().Msg("failed to get info if is setup process has been completed")
@@ -40,8 +42,12 @@ func main() {
 
 	if completedSetup {
 		log.Trace().Msg("Setup is completed")
-		center := widgets.NewDefaultBorderWidget(&env, widgets.NewMainPageWidget(&env))
-		w.SetContent(center)
+		if args[0] == "debug" {
+			w.SetContent(debugView.NewDebugViewWidget(&env))
+		} else {
+			center := widgets.NewDefaultBorderWidget(&env, widgets.NewMainPageWidget(&env))
+			w.SetContent(center)
+		}
 	} else {
 		log.Trace().Msg("Setup is not completed")
 		center := container.NewVBox(widgets.NewFirstAppRunWidget(&env))
