@@ -17,7 +17,6 @@ import (
 	"os"
 	"slices"
 	"sort"
-	"strings"
 	"time"
 )
 
@@ -45,22 +44,6 @@ type ExtendedStopTime struct {
 	RTTrip   gtfs.Trip
 }
 
-func FindStop(env *env.Env, searchString string) ([]gtfs.Stop, error) {
-	staticData, err := getStaticData(env)
-	if err != nil {
-		return nil, err
-	}
-	var stopList []gtfs.Stop
-	for _, stop := range staticData.Stops {
-		if strings.Contains(stop.Name, searchString) {
-			if stopIsTopLevel(stop) {
-				stopList = append(stopList, stop)
-			}
-		}
-	}
-	return stopList, nil
-}
-
 func QueryForDeparture(env *env.Env, stopName string) StationService {
 	currentTime := time.Now()
 	staticData, err := getStaticData(env)
@@ -71,8 +54,6 @@ func QueryForDeparture(env *env.Env, stopName string) StationService {
 	if err != nil {
 		log.Err(err).Msg("failed to get static data")
 	}
-	log.Debug().Msg("doing stuff with realtime data")
-	// rtScheduledTripMap := mapScheduledAndRealtimeTrips(realtimeData.Trips, staticData.Trips)
 	log.Debug().Msg("finished parsing data (" + fmt.Sprint(time.Since(currentTime)) + ")")
 
 	service := StationService{}
@@ -81,9 +62,11 @@ func QueryForDeparture(env *env.Env, stopName string) StationService {
 	activeTrips := getActiveTrips(staticData.Trips, currentTime)
 
 	for _, trip := range activeTrips {
-		for _, stopTime := range trip.StopTimes {
-			if stopTime.Stop.Name == stopName {
 
+		for _, stopTime := range trip.StopTimes {
+			// only actually try to match trips which stop at the station we are searching at
+			if stopTime.Stop.Name == stopName {
+				// the trip field doesn't get populated correctly so i'm doing it myself
 				stopTime.Trip = &trip
 
 				extendedRoute := service.ERoutes[GtfsRouteID(stopTime.Trip.Route.Id)]
@@ -93,6 +76,8 @@ func QueryForDeparture(env *env.Env, stopName string) StationService {
 				// associating realtime trip with scheduled trip
 			rtTripLoop:
 				for _, rtTrip := range realtimeData.Trips {
+					// checks if the IDs of the static and realtime trip are identical
+					// the scheduleRelationship thing is if the trip isn't scheduled and only exists in realtime. this is probably a bullshit solution and will have to be implemented more carefully
 					if rtTrip.ID.ID == trip.ID || rtTrip.ID.ScheduleRelationship != 0 {
 						log.Debug().Msg("trip id: " + trip.ID + " with route " + trip.Route.ShortName + " matched RT trip with id " + rtTrip.ID.ID + " and has relationship " + fmt.Sprint(rtTrip.ID.ScheduleRelationship))
 						log.Debug().Msg(fmt.Sprint(tripCurrentlyRunning(&trip, currentTime)))
@@ -112,7 +97,6 @@ func QueryForDeparture(env *env.Env, stopName string) StationService {
 					extendedRoute.StopTimesDirectionFalse = append(extendedRoute.StopTimesDirectionFalse, extendedStopTime)
 				}
 				service.ERoutes[GtfsRouteID(stopTime.Trip.Route.Id)] = extendedRoute
-
 			}
 		}
 	}
@@ -136,7 +120,7 @@ func getStaticData(env *env.Env) (*gtfs.Static, error) {
 		log.Err(err).Msg("failed getting gtfs datasource")
 		return &gtfs.Static{}, err
 	}
-	staticGtfsPath := env.App.Storage().RootURI().Path() + "staticGtfs.zip"
+	staticGtfsPath := env.App.Storage().RootURI().Path() + "/staticGtfs.zip"
 	if _, err := os.Stat(staticGtfsPath); errors.Is(err, os.ErrNotExist) {
 		log.Trace().Msg("static gtfs data not cached")
 		downloadedFile, err := os.Create(staticGtfsPath)
@@ -187,9 +171,9 @@ func getRealtimeData(env *env.Env) (*gtfs.Realtime, error) {
 		log.Err(err).Msg("failed getting gtfs datasource")
 		return &gtfs.Realtime{}, err
 	}
-	realtimeGtfsPath := env.App.Storage().RootURI().Path() + "realtimeGtfs.bin"
-	// if _, err := os.Stat(realtimeGtfsPath); errors.Is(err, os.ErrNotExist) {
-	if true {
+	realtimeGtfsPath := env.App.Storage().RootURI().Path() + "/realtimeGtfs.bin"
+	if _, err := os.Stat(realtimeGtfsPath); errors.Is(err, os.ErrNotExist) {
+		// if true {
 		log.Trace().Msg("realtime gtfs data not cached")
 		downloadedFile, err := os.Create(realtimeGtfsPath)
 		if err != nil {
@@ -320,13 +304,6 @@ func tripCurrentlyRunning(trip *gtfs.ScheduledTrip, currentTime time.Time) bool 
 func sortExtendedStopTimes(stopTimes []ExtendedStopTime) []ExtendedStopTime {
 	slices.SortFunc(stopTimes, func(a, b ExtendedStopTime) int {
 		return int(a.StopTime.DepartureTime - b.StopTime.DepartureTime)
-	})
-	return stopTimes
-}
-
-func sortStopTimes(stopTimes []gtfs.ScheduledStopTime) []gtfs.ScheduledStopTime {
-	slices.SortFunc(stopTimes, func(a, b gtfs.ScheduledStopTime) int {
-		return int(a.DepartureTime - b.DepartureTime)
 	})
 	return stopTimes
 }

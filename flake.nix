@@ -15,14 +15,14 @@
           };
         };
         
-        buildToolsVersion = "33.0.2";
+        buildToolsVersion = "36.0.0";
         
         # Compose Android SDK and NDK
         androidComposition = pkgs.androidenv.composeAndroidPackages {
           cmdLineToolsVersion = "8.0";
           toolsVersion = "26.1.1";
-          platformToolsVersion = "33.0.3";
-          buildToolsVersions = [ "33.0.2" ];
+          platformToolsVersion = "36.0.0";
+          buildToolsVersions = [ "36.0.0" ];
           includeEmulator = false;
           platformVersions = [ "28" "29" "30" ];
           includeSources = false;

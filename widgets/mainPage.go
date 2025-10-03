@@ -17,9 +17,11 @@ func NewMainPageWidget(env *env.Env) *MainPageWidget {
 	w := &MainPageWidget{}
 	w.ExtendBaseWidget(w)
 
-	w.content = container.NewVBox(
-		NewDepartureSearchWidget(env),
+	tabs := container.NewAppTabs(
+		container.NewTabItem("Departure", NewDepartureSearchWidget(env)),
+		container.NewTabItem("Route", NewRouteSearchWidget(env)),
 	)
+	w.content = container.NewVBox(tabs)
 
 	return w
 }
