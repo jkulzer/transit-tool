@@ -72,8 +72,7 @@ func NewDirectionDepartureChipWidget(env *env.Env, stopTimeList []gtfsHelpers.Ex
 	log.Debug().Msg("creating direction departure widget for route " + fmt.Sprint(stopTimeList[0].StopTime.Trip.Route.ShortName))
 
 	for _, stopTime := range stopTimeList {
-		departureDuration := stopTime.StopTime.DepartureTime
-		departureTime := time.Date(currentTime.Year(), currentTime.Month(), currentTime.Day(), int(0), int(0), int(0), int(0), currentTime.Location()).Add(departureDuration)
+		departureTime := gtfsHelpers.GtfsDurationToTime(stopTime.StopTime.DepartureTime)
 
 		if departureTime.After(currentTime) && departureTime.Sub(time.Now()) < time.Hour {
 
@@ -106,7 +105,7 @@ func NewDirectionDepartureChipWidget(env *env.Env, stopTimeList []gtfsHelpers.Ex
 					log.Debug().Msg(fmt.Sprint(stopTimeUpdate))
 					log.Debug().Msg(fmt.Sprint(stopTime.StopTime))
 				}
-				if strings.Contains(stopTime.StopTime.Stop.Id, *stopTimeUpdate.StopID) && stopTime.StopTime.Stop.Id != *stopTimeUpdate.StopID {
+				if strings.Contains(stopTime.StopTime.Stop.Id, *stopTimeUpdate.StopID) /* && stopTime.StopTime.Stop.Id != *stopTimeUpdate.StopID */ {
 					var delayColor color.Color
 					var delayString string
 					if stopTime.RTTrip.ID.ScheduleRelationship == gtfsProto.TripDescriptor_CANCELED {
@@ -114,13 +113,16 @@ func NewDirectionDepartureChipWidget(env *env.Env, stopTimeList []gtfsHelpers.Ex
 						delayColor = colors.Red()
 						log.Debug().Msg("trip cancelled")
 					} else {
-						isDelayed, delay := gtfsHelpers.ProcessStopTimeUpdate(stopTimeUpdate, stopTime.StopTime, currentTime)
-						if isDelayed {
+						_, _, departureDelay, departureDelayStatus := gtfsHelpers.ProcessStopTimeUpdate(stopTimeUpdate, stopTime.StopTime, currentTime)
+						switch departureDelayStatus {
+						case gtfsHelpers.Delayed:
 							delayColor = colors.Red()
-						} else {
+						case gtfsHelpers.Early:
+							delayColor = colors.Blue()
+						case gtfsHelpers.OnTime:
 							delayColor = colors.Green()
 						}
-						delayString = delay.String()
+						delayString = departureDelay.String()
 					}
 					departureDelayWidget = canvas.NewText(delayString, delayColor)
 				}

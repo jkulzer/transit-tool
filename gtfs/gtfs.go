@@ -340,3 +340,9 @@ func getActiveTrips(trips []gtfs.ScheduledTrip, currentTime time.Time) []gtfs.Sc
 	}
 	return activeTrips
 }
+
+func GtfsDurationToTime(durationValue time.Duration) time.Time {
+	currentTime := time.Now()
+	timeValue := time.Date(currentTime.Year(), currentTime.Month(), currentTime.Day(), int(0), int(0), int(0), int(0), currentTime.Location()).Add(durationValue)
+	return timeValue
+}

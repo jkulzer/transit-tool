@@ -1,6 +1,8 @@
 package widgets
 
 import (
+	"time"
+
 	"fyne.io/fyne/v2"
 	"fyne.io/fyne/v2/container"
 	"fyne.io/fyne/v2/widget"
@@ -69,7 +71,12 @@ func NewRouteSearchWidget(env *env.Env) *RouteSearchWidget {
 
 	searchButton := widget.NewButton("Search", func() {
 
+		// remove time.Now()
+		route := gtfs.CalculateRoute(env, time.Now(), departureInput.Text, arrivalInput.Text)
+
 		resultBox.Objects = nil
+
+		resultBox.Add(widget.NewLabel("time to reach destination is " + route.Length.String()))
 
 		log.Debug().Msg("finished departure search")
 	})

@@ -42,7 +42,7 @@ func main() {
 
 	if completedSetup {
 		log.Trace().Msg("Setup is completed")
-		if args[0] == "debug" {
+		if len(args) > 0 && args[0] == "debug" {
 			w.SetContent(debugView.NewDebugViewWidget(&env))
 		} else {
 			center := widgets.NewDefaultBorderWidget(&env, widgets.NewMainPageWidget(&env))
