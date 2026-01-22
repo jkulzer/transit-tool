@@ -1,25 +1,25 @@
 package widgets
 
 import (
-	"fmt"
-	"image/color"
-	"strings"
-	"time"
+	// "fmt"
+	// "image/color"
+	// "strings"
+	// "time"
 
 	"github.com/rs/zerolog/log"
 
-	gtfsProto "github.com/jamespfennell/gtfs/proto"
+	// gtfsProto "github.com/jamespfennell/gtfs/proto"
 
 	"fyne.io/fyne/v2"
-	"fyne.io/fyne/v2/canvas"
+	// "fyne.io/fyne/v2/canvas"
 	"fyne.io/fyne/v2/container"
-	"fyne.io/fyne/v2/dialog"
+	// "fyne.io/fyne/v2/dialog"
 	"fyne.io/fyne/v2/widget"
 
-	"github.com/jkulzer/transit-tool/colors"
+	// "github.com/jkulzer/transit-tool/colors"
 	"github.com/jkulzer/transit-tool/env"
 	gtfsHelpers "github.com/jkulzer/transit-tool/gtfs"
-	"github.com/jkulzer/transit-tool/helpers"
+	// "github.com/jkulzer/transit-tool/helpers"
 )
 
 type JourneyChipWidget struct {

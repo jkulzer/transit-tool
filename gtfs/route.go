@@ -12,8 +12,10 @@ import (
 )
 
 type Journey struct {
-	Length      time.Duration
-	MemberStops []gtfs.Stop
+	Length          time.Duration
+	MemberStopTimes []gtfs.ScheduledStopTime
+	MemberStops     []gtfs.Stop
+	MemberTrips     []gtfs.ScheduledTrip
 }
 
 func CalculateJourney(env *env.Env, departureTime time.Time, departureStation, arrivalStation string) Journey {
@@ -58,32 +60,49 @@ func CalculateJourney(env *env.Env, departureTime time.Time, departureStation, a
 }
 
 // TODO: this is full of copy-pasting from widgets/departureChip.go, fix it
-func processStopTimes(extendedStopTimes []ExtendedStopTime, requestedDepartureTime time.Time, timeToReach *map[string]Journey) {
+// TODO: this function sucks, document it
+func processStopTimes(
+	extendedStopTimes []ExtendedStopTime,
+	requestedDepartureTime time.Time,
+	journeys *map[string]Journey, // map of journeys, key is stop id
+) {
+
 	for _, extendedStopTime := range extendedStopTimes {
+		// time train leaves from stop
 		departureTime := GtfsDurationToTime(extendedStopTime.StopTime.DepartureTime)
+
 	stopTimeUpdateLoop:
 		for _, stopTimeUpdate := range extendedStopTime.RTTrip.StopTimeUpdates {
+			// matches stop time with realtime trip stop time
 			if strings.Contains(extendedStopTime.StopTime.Stop.Root().Id, *stopTimeUpdate.StopID) {
+				// gets the current delay from the realtime stop time
 				_, _, departureDelay, _ := ProcessStopTimeUpdate(stopTimeUpdate, extendedStopTime.StopTime, departureTime)
 				departureTime.Add(departureDelay)
+				// found matching rt stop time so breaking loop
 				break stopTimeUpdateLoop
 			}
 		}
 
-		previousTimeToReach := (*timeToReach)[extendedStopTime.StopTime.Stop.Root().Id].Length
-		if previousTimeToReach != time.Duration(0) {
-			// 	if previousTimeToReach >  {
+		// gets the current journey to the stop in the list of stop times
+		currentlyBestJourney := (*journeys)[extendedStopTime.StopTime.Stop.Root().Id]
+		if currentlyBestJourney.Length != time.Duration(0) {
+			// 	if currentlyBestJourney.Length >  {
 			//
 			// }
 		} else {
 		}
+
 		for _, stopTime := range extendedStopTime.StopTime.Trip.StopTimes {
 			arrivalTime := GtfsDurationToTime(stopTime.ArrivalTime)
+
 			if arrivalTime.After(departureTime) {
-				journeyForStop := (*timeToReach)[stopTime.Stop.Root().Id]
+				journeyForStop := (*journeys)[stopTime.Stop.Root().Id]
 				journeyForStop.Length = arrivalTime.Sub(departureTime)
-				journeyForStop.MemberStops = append(journeyForStop.MemberStops, *stopTime.Stop)
-				(*timeToReach)[stopTime.Stop.Root().Id] = journeyForStop
+				// journeyForStop.MemberStops = append(journeyForStop.MemberStops, *stopTime.Stop)
+				journeyForStop.MemberStopTimes = []gtfs.ScheduledStopTime{stopTime}
+				journeyForStop.MemberStops = []gtfs.Stop{*stopTime.Stop}
+				journeyForStop.MemberTrips = []gtfs.ScheduledTrip{*extendedStopTime.StopTime.Trip}
+				(*journeys)[stopTime.Stop.Root().Id] = journeyForStop
 			}
 		}
 	}

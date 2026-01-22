@@ -11,7 +11,9 @@ import (
 
 	"github.com/jkulzer/transit-tool/completion"
 	"github.com/jkulzer/transit-tool/env"
-	"github.com/jkulzer/transit-tool/gtfs"
+	gtfsHelpers "github.com/jkulzer/transit-tool/gtfs"
+
+	"github.com/jamespfennell/gtfs"
 )
 
 type RouteSearchWidget struct {
@@ -28,7 +30,7 @@ func NewRouteSearchWidget(env *env.Env) *RouteSearchWidget {
 	departureInput := completion.NewCompletionEntry([]string{})
 
 	departureInput.OnChanged = func(searchTerm string) {
-		stopResultsRanked := gtfs.SearchStopList(searchTerm, env)
+		stopResultsRanked := gtfsHelpers.SearchStopList(searchTerm, env)
 
 		// no results
 		if len(stopResultsRanked) == 0 {
@@ -50,7 +52,7 @@ func NewRouteSearchWidget(env *env.Env) *RouteSearchWidget {
 	arrivalInput := completion.NewCompletionEntry([]string{})
 
 	arrivalInput.OnChanged = func(searchTerm string) {
-		stopResultsRanked := gtfs.SearchStopList(searchTerm, env)
+		stopResultsRanked := gtfsHelpers.SearchStopList(searchTerm, env)
 
 		// no results
 		if len(stopResultsRanked) == 0 {
@@ -72,11 +74,19 @@ func NewRouteSearchWidget(env *env.Env) *RouteSearchWidget {
 	searchButton := widget.NewButton("Search", func() {
 
 		// remove time.Now()
-		route := gtfs.CalculateRoute(env, time.Now(), departureInput.Text, arrivalInput.Text)
+		route := gtfsHelpers.CalculateJourney(env, time.Now(), departureInput.Text, arrivalInput.Text)
 
 		resultBox.Objects = nil
 
 		resultBox.Add(widget.NewLabel("time to reach destination is " + route.Length.String()))
+		for _, routeStop := range route.MemberStops {
+			resultBox.Add(widget.NewLabel("through stop name: " + routeStop.Name))
+			log.Debug().Msg("added through stop name label")
+		}
+		for _, routeTrip := range route.MemberTrips {
+			log.Debug().Msg("added trip view widget for trip with id " + routeTrip.ID)
+			resultBox.Add(NewTripViewWidget(env, routeTrip, gtfs.Trip{}))
+		}
 
 		log.Debug().Msg("finished departure search")
 	})
