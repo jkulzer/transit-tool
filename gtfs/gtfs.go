@@ -66,6 +66,7 @@ func QueryForDeparture(env *env.Env, stopName string) StationService {
 		for _, stopTime := range trip.StopTimes {
 			// only actually try to match trips which stop at the station we are searching at
 			if stopTime.Stop.Name == stopName {
+
 				// the trip field doesn't get populated correctly so i'm doing it myself
 				stopTime.Trip = &trip
 

@@ -7,6 +7,7 @@ import (
 
 	"github.com/rs/zerolog/log"
 
+	"fmt"
 	"strings"
 	"time"
 )
@@ -18,25 +19,16 @@ type Journey struct {
 	MemberTrips     []gtfs.ScheduledTrip
 }
 
-func CalculateJourney(env *env.Env, departureTime time.Time, departureStation, arrivalStation string) Journey {
+func CalculateJourney(env *env.Env, departureTime time.Time, departureStation, arrivalStation string, maxTransfers uint) Journey {
+	maxTransfers = 3
 	journeys := make(map[string]Journey)
 	stationService := QueryForDeparture(env, departureStation)
 
 	journeys[departureStation] = Journey{Length: 0}
 
-	for _, eRoute := range stationService.ERoutes {
-		if len(eRoute.StopTimesDirectionTrue) > 0 {
-			processStopTimes(eRoute.StopTimesDirectionTrue, departureTime, &journeys)
-		}
-		if len(eRoute.StopTimesDirectionFalse) > 0 {
-			processStopTimes(eRoute.StopTimesDirectionFalse, departureTime, &journeys)
-		}
-		if len(eRoute.StopTimesNoDirection) > 0 {
-			processStopTimes(eRoute.StopTimesNoDirection, departureTime, &journeys)
-		}
-	}
-
 	log.Debug().Msg("arrival station: :" + arrivalStation)
+
+	splitERoutes(stationService, maxTransfers, departureTime, &journeys)
 
 	var arrivalStopID string
 
@@ -57,6 +49,26 @@ func CalculateJourney(env *env.Env, departureTime time.Time, departureStation, a
 		}
 	}
 	return Journey{}
+}
+
+func splitERoutes(stationService StationService, maxTransfers uint, departureTime time.Time, journeys *map[string]Journey) {
+	for _, eRoute := range stationService.ERoutes {
+		if len(eRoute.StopTimesDirectionTrue) > 0 {
+			for range maxTransfers {
+				processStopTimes(eRoute.StopTimesDirectionTrue, departureTime, journeys)
+			}
+		}
+		if len(eRoute.StopTimesDirectionFalse) > 0 {
+			for range maxTransfers {
+				processStopTimes(eRoute.StopTimesDirectionFalse, departureTime, journeys)
+			}
+		}
+		if len(eRoute.StopTimesNoDirection) > 0 {
+			for range maxTransfers {
+				processStopTimes(eRoute.StopTimesNoDirection, departureTime, journeys)
+			}
+		}
+	}
 }
 
 // TODO: this is full of copy-pasting from widgets/departureChip.go, fix it
@@ -93,16 +105,35 @@ func processStopTimes(
 		}
 
 		for _, stopTime := range extendedStopTime.StopTime.Trip.StopTimes {
+
 			arrivalTime := GtfsDurationToTime(stopTime.ArrivalTime)
 
-			if arrivalTime.After(departureTime) {
+			if arrivalTime.After(departureTime) && departureTime.After(requestedDepartureTime) {
 				journeyForStop := (*journeys)[stopTime.Stop.Root().Id]
-				journeyForStop.Length = arrivalTime.Sub(departureTime)
-				// journeyForStop.MemberStops = append(journeyForStop.MemberStops, *stopTime.Stop)
-				journeyForStop.MemberStopTimes = []gtfs.ScheduledStopTime{stopTime}
-				journeyForStop.MemberStops = []gtfs.Stop{*stopTime.Stop}
-				journeyForStop.MemberTrips = []gtfs.ScheduledTrip{*extendedStopTime.StopTime.Trip}
-				(*journeys)[stopTime.Stop.Root().Id] = journeyForStop
+
+				var lastJourneyStopTime gtfs.ScheduledStopTime
+				var noJourneyValuesPresent bool
+
+				if len(journeyForStop.MemberStopTimes) == 0 {
+					noJourneyValuesPresent = true
+				} else {
+					lastJourneyStopTime = journeyForStop.MemberStopTimes[len(journeyForStop.MemberStopTimes)-1]
+				}
+
+				if lastJourneyStopTime.ArrivalTime > stopTime.ArrivalTime || noJourneyValuesPresent {
+					journeyForStop.Length = arrivalTime.Sub(departureTime)
+
+					// sets currently iterated stop time as member in list
+					journeyForStop.MemberStopTimes = []gtfs.ScheduledStopTime{stopTime}
+
+					journeyForStop.MemberStops = append(journeyForStop.MemberStops, *stopTime.Stop)
+					journeyForStop.MemberStops = []gtfs.Stop{*stopTime.Stop}
+					journeyForStop.MemberTrips = []gtfs.ScheduledTrip{*extendedStopTime.StopTime.Trip}
+					(*journeys)[stopTime.Stop.Root().Id] = journeyForStop
+					if strings.Contains(stopTime.Stop.Name, "Warschauer") {
+						log.Debug().Msg(fmt.Sprint(journeyForStop))
+					}
+				}
 			}
 		}
 	}
