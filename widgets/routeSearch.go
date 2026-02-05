@@ -6,12 +6,10 @@ import (
 
 	"fyne.io/fyne/v2"
 	"fyne.io/fyne/v2/container"
-	"fyne.io/fyne/v2/dialog"
 	"fyne.io/fyne/v2/widget"
 
 	"github.com/rs/zerolog/log"
 
-	"github.com/jamespfennell/gtfs"
 	"github.com/jkulzer/transit-tool/completion"
 	"github.com/jkulzer/transit-tool/env"
 	gtfsHelpers "github.com/jkulzer/transit-tool/gtfs"
@@ -74,49 +72,17 @@ func NewRouteSearchWidget(env *env.Env) *RouteSearchWidget {
 
 	searchButton := widget.NewButton("Search", func() {
 
-		// remove time.Now()
-		route := gtfsHelpers.CalculateJourney(env, time.Now(), departureInput.Text, arrivalInput.Text, 3)
+		departureStationID := gtfsHelpers.StopNameToIFOPT(env, departureInput.Text)
+		arrivalStationID := gtfsHelpers.StopNameToIFOPT(env, arrivalInput.Text)
+		journey := gtfsHelpers.CalculateJourney(env, time.Now(), departureStationID, arrivalStationID, 3)
 
 		resultBox.Objects = nil
 
-		if route.Length != 0 {
-			resultBox.Add(widget.NewLabel("time to reach destination is " + route.Length.String()))
-		}
-		for _, routeStop := range route.MemberStops {
-			resultBox.Add(widget.NewLabel("through stop name: " + routeStop.Name))
-			log.Debug().Msg("added through stop name label")
+		arrivalStopLabel := journey[len(journey)-1][arrivalStationID]
+		for i := len(journey) - 1; i >= 0; i-- {
 		}
 
-		var departureStopTime gtfs.ScheduledStopTime
-		for _, firstTripStopTime := range route.MemberTrips[0].StopTimes {
-			if firstTripStopTime.Stop.Name == departureInput.Text {
-				departureStopTime = firstTripStopTime
-				break
-			}
-		}
-		for memberIndex, stopTime := range route.MemberStopTimes {
-
-			foundTrip := route.MemberTrips[memberIndex]
-
-			paddingFactor := float32(10)
-			tripView := NewTripViewWidget(env, foundTrip, gtfs.Trip{})
-			tripDialog := dialog.NewCustom("Trip", "Close", tripView, env.Window)
-			windowSize := env.Window.Canvas().Size()
-			tripDialog.Resize(fyne.NewSize(windowSize.Height-windowSize.Height/paddingFactor, windowSize.Width-windowSize.Width/paddingFactor))
-			tripDialog.Show()
-
-			resultBox.Add(
-				container.NewVBox(
-					widget.NewLabel("trip headsign "+fmt.Sprint(route.MemberTrips[memberIndex].Headsign)),
-					widget.NewLabel("trip id "+fmt.Sprint(foundTrip.ID)),
-					widget.NewLabel("trip route name "+fmt.Sprint(foundTrip.Route.ShortName)),
-					// NewTripViewWidget(env, foundTrip, gtfs.Trip{}),
-					widget.NewLabel("stop "+stopTime.Stop.Name),
-					widget.NewLabel("departure time "+gtfsHelpers.DurationToTime(departureStopTime.DepartureTime).String()),
-					widget.NewLabel("arrival time "+gtfsHelpers.DurationToTime(stopTime.ArrivalTime).String()),
-				),
-			)
-		}
+		resultBox.Add(widget.NewLabel("arrival time: " + fmt.Sprint(journey)))
 
 		log.Debug().Msg("finished departure search")
 	})

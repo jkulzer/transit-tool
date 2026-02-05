@@ -2,6 +2,8 @@ package gtfs
 
 import (
 	"github.com/jamespfennell/gtfs"
+
+	"github.com/jkulzer/transit-tool/env"
 )
 
 // the stop.Root() function returns the same stop if the stop is the topmost stop, so this is a wrapper
@@ -12,4 +14,13 @@ func stopIsTopLevel(stop gtfs.Stop) bool {
 	} else {
 		return false
 	}
+}
+
+func StopNameToIFOPT(env *env.Env, stopName string) string {
+	for _, stop := range env.GtfsStaticData.Stops {
+		if stop.Name == stopName {
+			return stop.Root().Id
+		}
+	}
+	return ""
 }
